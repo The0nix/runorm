@@ -2,6 +2,7 @@ import json
 import re
 import torch
 from transformers import AutoTokenizer, GPT2Tokenizer, T5ForConditionalGeneration, BertForTokenClassification
+from transformers import AutoTokenizer, GPT2Tokenizer, T5ForConditionalGeneration, BertForTokenClassification
 from transformers import pipeline
 from .number_to_word import Numbers2Words
 import numpy as np
@@ -29,21 +30,24 @@ class RUNorm:
             "medium": "RUNorm/RUNorm-normalizer-medium",
             "big": "RUNorm/RUNorm-normalizer-big"
         }
-        
-        
-    def load(self, model_size="small", device="cpu", workdir=None):
+
+
+    def load(self, model_size="small", device="cpu", workdir=None, paths=None):
         if workdir:
             self.workdir = workdir
         else:
             self.workdir = str(pathlib.Path(__file__).resolve().parent) + "/cache"
 
+        if paths is None:
+            paths = self.paths
+
         self.model_size = model_size
-        self.abbr_tokenizer = AutoTokenizer.from_pretrained(self.paths[model_size], cache_dir=self.workdir)
-        self.abbr_model = T5ForConditionalGeneration.from_pretrained(self.paths[model_size], cache_dir=self.workdir)
-        self.angl_tokenizer = AutoTokenizer.from_pretrained(self.paths["kirillizator"], cache_dir=self.workdir)
-        self.angl_model = T5ForConditionalGeneration.from_pretrained(self.paths["kirillizator"], cache_dir=self.workdir)
-        self.tagger_model = BertForTokenClassification.from_pretrained(self.paths["tagger"], cache_dir=self.workdir)
-        self.tagger_tokenizer = AutoTokenizer.from_pretrained(self.paths["tagger"], cache_dir=self.workdir)
+        self.abbr_tokenizer = AutoTokenizer.from_pretrained(paths[model_size], cache_dir=self.workdir)
+        self.abbr_model = T5ForConditionalGeneration.from_pretrained(paths[model_size], cache_dir=self.workdir)
+        self.angl_tokenizer = AutoTokenizer.from_pretrained(paths["kirillizator"], cache_dir=self.workdir)
+        self.angl_model = T5ForConditionalGeneration.from_pretrained(paths["kirillizator"], cache_dir=self.workdir)
+        self.tagger_model = BertForTokenClassification.from_pretrained(paths["tagger"], cache_dir=self.workdir)
+        self.tagger_tokenizer = AutoTokenizer.from_pretrained(paths["tagger"], cache_dir=self.workdir)
         self.tagger = pipeline("ner", model=self.tagger_model, tokenizer=self.tagger_tokenizer, aggregation_strategy="average")
         self.abbr_model.to(device)
         self.angl_model.to(device)
@@ -71,10 +75,10 @@ class RUNorm:
             's': 'эс', 't': 'ти', 'u': 'ю', 'v': 'ви', 'w': 'дабл-ю', 'x': 'экс',
             'y': 'уай', 'z': 'зэд'
         }
-    
+
         text = text.lower()
         result = ""
-    
+
         for char in text:
             if char.isalpha():
                 result += latin_to_cyrillic.get(char, char)
@@ -83,7 +87,7 @@ class RUNorm:
         result = result.strip()
         return result
 
-    
+
     def process_sentence(self, text):
         return re.findall(self.re_tokens, text)
 
@@ -99,7 +103,7 @@ class RUNorm:
         for char in word:
             if char not in english_chars:
                 return False
-        
+
         return True
     def construct_prompt(self, text, angl_mode=False):
         used = False
@@ -135,7 +139,7 @@ class RUNorm:
                             result += token_to_add
                     etid += 1
                     token_to_add = ""
-                    
+
                 result += token
             else:
                 token_to_add += token
@@ -259,7 +263,7 @@ class RUNorm:
             else:
                 prompt += text[current_index:entity['start']] + entity['word']
             current_index = entity['end']
-        
+
         prompt += text[current_index:]
         if used:
             result = self.predict_abbr(prompt)
@@ -290,6 +294,6 @@ class RUNorm:
             final_answer = self.proccess_abbr(answer)
             final_answer, _ = self.construct_prompt(final_answer, angl_mode=True)
             out = out + " " + final_answer
-            
+
         #elapsed_time = time.time() - start
         return out.strip()
