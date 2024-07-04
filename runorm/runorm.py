@@ -2,7 +2,6 @@ import json
 import re
 import torch
 from transformers import AutoTokenizer, GPT2Tokenizer, T5ForConditionalGeneration, BertForTokenClassification
-from transformers import AutoTokenizer, GPT2Tokenizer, T5ForConditionalGeneration, BertForTokenClassification
 from transformers import pipeline
 from .number_to_word import Numbers2Words
 import numpy as np
